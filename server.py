@@ -71,17 +71,31 @@ def evaluate_hand(hand):
     return "High card"
 
 
-# create new game
-def create_new_game():
+# create new game and return starting game state
+def create_new_game(player1, player2):
     # create deck
     deck = create_fresh_deck()
     # shuffle deck
     deck = shuffle_deck(deck)
-    # return deck
-    return deck
+    # return starting game state
+    return {
+        "player_1" : player1,
+        "player_2" : player2,
+        "player_1_balance": 20,
+        "player_2_balance": 20,
+        "player_1_hand" : [],
+        "player_2_hand": [],
+        "player_1_blind": 2,
+        "player_2_blind": 1,
+        "throw_down_cards": [],
+        "pot_balance": 0,
+        "deck": deck
+        }
 
-deck = create_new_game()
-print_deck(deck)
+games = {
+    "game_key": create_new_game("IP1", "IP2")
+}
+print(games['game_key'])
 
 # server 
 # async def run_server(websocket, path): 

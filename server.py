@@ -3,6 +3,9 @@ import random
 import asyncio
 import websockets
 
+# texas hold'em hand rankings
+RANKINGS = { "High Card": 0, "Pair": 1, "Two Pair": 2, "Three of a Kind": 3, "Straight": 4, "Flush": 5, "Full House": 6, "Four of a Kind": 7, "Straight Flush": 8, "Royal Flush": 9 }
+
 # card suits
 SUITS = ["Hearts", "Diamonds", "Clubs", "Spades"]
 
@@ -38,6 +41,35 @@ def create_fresh_deck():
 def shuffle_deck(deck):
     random.shuffle(deck)
     return deck
+
+# evaluate hand
+def evaluate_hand(hand):
+    # sort hand
+    hand.sort()
+    # check for flush
+    if hand[0][0] == hand[1][0] == hand[2][0] == hand[3][0] == hand[4][0]:
+        return "Flush"
+    # check for straight
+    if hand[0][1] == hand[1][1] + 1 == hand[2][1] + 2 == hand[3][1] + 3 == hand[4][1] + 4:
+        return "Straight"
+    # check for four of a kind
+    if hand[0][1] == hand[1][1] == hand[2][1] == hand[3][1]:
+        return "Four of a kind"
+    # check for full house
+    if hand[0][1] == hand[1][1] == hand[2][1] and hand[3][1] == hand[4][1]:
+        return "Full house"
+    # check for three of a kind
+    if hand[0][1] == hand[1][1] == hand[2][1]:
+        return "Three of a kind"
+    # check for two pair
+    if hand[0][1] == hand[1][1] and hand[2][1] == hand[3][1]:
+        return "Two pair"
+    # check for pair
+    if hand[0][1] == hand[1][1]:
+        return "Pair"
+    # check for high card
+    return "High card"
+
 
 # create new game
 def create_new_game():

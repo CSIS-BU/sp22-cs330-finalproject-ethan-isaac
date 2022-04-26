@@ -155,6 +155,11 @@ def send_message_to_addr(addr, message):
     conn = connections[addr]
     conn.sendall(message.encode())
 
+def send_game_state_to_players(code):
+    send_message_to_addr(games[code]["player_1"], json.dumps(get_public_game_state(games[code], 1)))
+    send_message_to_addr(games[code]["player_2"], json.dumps(get_public_game_state(games[code], 2)))
+       
+
 def handle_action(message, player):
     if(message == "new_game"):
         code = str(time.time())
@@ -176,15 +181,28 @@ def handle_action(message, player):
         code = message[:18]
         msg = message[18:]
 
+    # preemptively change turn
+    current_turn = games[code]["turn"]
+    games[code]["turn"] = 1 if current_turn == 2 else 2
     if msg == "check":
-        pass
-    elif msg == "bet":
-        pass
+        send_game_state_to_players(code)
+    elif "bet" in msg:
+        amount = int(msg[3:])
+        games[code]["player_" + str(current_turn) + "_balance"] -= amount
+        games[code]["pot"] += amount
+        games[code]["pending_bet"] = int(msg[3:])
     elif msg == "call":
-        pass
+        amount = games[code]["pending_bet"]
+        games[code]["player_" + str(current_turn) + "_balance"] -= amount
+        games[code]["pot"] += amount
+        games[code]["pending_bet"] = 0
     elif msg == "raise":
-        pass
+        amount = int(msg[3:])
+        games[code]["player_" + str(current_turn) + "_balance"] -= amount
+        games[code]["pot"] += amount
+        games[code]["pending_bet"] = int(msg[3:])
     elif msg == "fold":
+        
         pass
 
     p = 1 if games[code]["player_1"] == player else 2

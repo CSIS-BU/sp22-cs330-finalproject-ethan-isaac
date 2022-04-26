@@ -194,9 +194,9 @@ def handle_action(message, player):
     
     msg = ""
     code = ""
-    if(len(message) > 17):
-        code = message[:18]
-        msg = message[18:]
+    if(len(message) > 4):
+        code = message[:4]
+        msg = message[4:]
 
     print("CODE", code, "MSG", msg)
 

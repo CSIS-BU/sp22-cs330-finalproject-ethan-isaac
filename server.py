@@ -1,7 +1,15 @@
 # server.py
+from calendar import c
 import random
-import asyncio
-import websockets
+import socket
+import time
+import threading
+import json
+
+# server setup
+HOST = "127.0.0.1"
+PORT = 8888  
+BUFFER_SIZE = 1024
 
 # texas hold'em hand rankings
 RANKINGS = { "High Card": 0, "Pair": 1, "Two Pair": 2, "Three of a Kind": 3, "Straight": 4, "Flush": 5, "Full House": 6, "Four of a Kind": 7, "Straight Flush": 8, "Royal Flush": 9 }
@@ -11,6 +19,13 @@ SUITS = ["Hearts", "Diamonds", "Clubs", "Spades"]
 
 # royal cards
 ROYAL = ["Jack", "Queen", "King", "Ace"]
+
+# state
+num_active_games = 0
+games =  {}
+connections = {}
+data_lock = threading.Lock()
+
 
 def get_card_suit(card):
     return SUITS[card[0]]
@@ -70,48 +85,146 @@ def evaluate_hand(hand):
     # check for high card
     return "High card"
 
+# deal cards to players
+def deal_cards(game_state):
+    # burn a card
+    game_state["deck"].pop(0)
+    # deal cards to player 1
+    game_state["player_1_hand"].append(game_state["deck"].pop())
+    game_state["player_2_hand"].append(game_state["deck"].pop())
+    # deal cards to player 2
+    game_state["player_1_hand"].append(game_state["deck"].pop())
+    game_state["player_2_hand"].append(game_state["deck"].pop())
+    # return game state
+    return game_state
 
 # create new game and return starting game state
-def create_new_game(player1, player2):
+def create_new_game(player1):
     # create deck
     deck = create_fresh_deck()
     # shuffle deck
     deck = shuffle_deck(deck)
     # return starting game state
     return {
+        "turn": 2,
         "player_1" : player1,
-        "player_2" : player2,
+        "player_2" : "",
         "player_1_balance": 20,
         "player_2_balance": 20,
         "player_1_hand" : [],
         "player_2_hand": [],
-        "player_1_blind": 2,
-        "player_2_blind": 1,
+        "player_1_blind": 1,
+        "player_2_blind": 2,
         "throw_down_cards": [],
         "pot_balance": 0,
-        "deck": deck
+        "deck": deck,
+        "pending_bet": 0
         }
 
-games = {
-    "game_key": create_new_game("IP1", "IP2")
-}
-print(games['game_key'])
+def get_public_game_state(game_state, player):
+    if player == 1:
+        return {
+            "turn": game_state["turn"],
+            "player_1" : game_state["player_1"],
+            "player_2" : game_state["player_2"],
+            "player_1_balance": game_state["player_1_balance"],
+            "player_2_balance": game_state["player_2_balance"],
+            "player_1_hand" : game_state["player_1_hand"],
+            "player_1_blind": game_state["player_1_blind"],
+            "player_2_blind": game_state["player_2_blind"],
+            "throw_down_cards": game_state["throw_down_cards"],
+            "pot_balance": game_state["pot_balance"],
+            "pending_bet": game_state["pending_bet"],
+            }
+    else:
+        return {
+            "turn": game_state["turn"],
+            "player_1" : game_state["player_1"],
+            "player_2" : game_state["player_2"],
+            "player_1_balance": game_state["player_1_balance"],
+            "player_2_balance": game_state["player_2_balance"],
+            "player_2_hand": game_state["player_2_hand"],
+            "player_1_blind": game_state["player_1_blind"],
+            "player_2_blind": game_state["player_2_blind"],
+            "throw_down_cards": game_state["throw_down_cards"],
+            "pot_balance": game_state["pot_balance"],
+            "pending_bet": game_state["pending_bet"],
+            }
 
-# server 
-# async def run_server(websocket, path): 
-#     # generate random number between 1 and 100
-#     answer = int(100 * (random.random())) + 1
-#     # get websocket id
-#     guess = await websocket.recv()
-#     print("Received: {}".format(guess))
-#     if(answer == int(guess)):
-#         await websocket.send("You got it!")
-#     else:
-#         await websocket.send("Try again!")
+def send_message_to_addr(addr, message):
+    conn = connections[addr]
+    conn.sendall(message.encode())
+
+def handle_action(message, player):
+    if(message == "new_game"):
+        code = str(time.time())
+        games[code] = create_new_game(player)
+        return str(code) # use current timestamp as game id
+    elif message[0:9] == "join_game":
+        code = message[10:len(message) - 2]
+        games[code]["player_2"] = player
+        # deal cards
+        games[code] = deal_cards(games[code])
+        send_message_to_addr(player, json.dumps(get_public_game_state(games[code], 2)))
+        send_message_to_addr(games[code]["player_1"], json.dumps(get_public_game_state(games[code], 1)))
+
+    msg = ""
+    code = ""
+    if(len(message) > 18):
+        code = message[:18]
+        msg = message[18:]
+
+    if msg == "check":
+        pass
+    elif msg == "bet":
+        pass
+    elif msg == "call":
+        pass
+    elif msg == "raise":
+        pass
+    elif msg == "fold":
+        pass
+
+    p = 1 if games[code]["player_1"] == player else 2
+    print("Player ", p, " action: ", msg, " on game ", code)
+    send_message_to_addr(games[code]["player_" + str(1 if p == 2 else 2)], "Player " + str(p) + " " + msg + "s")
+
+    return ""
+
+def handle_current_connection(conn, addr):
+    while True:
+        # receive data
+        data = conn.recv(BUFFER_SIZE).decode()
+        if not data:
+            continue
+        elif data == "close":
+            print("Connection from {} closed".format(addr))
+            # remove connection from selector
+            connections.pop(addr)
+        else:
+            # process data
+            print("Received data: {} from {}".format(data, addr))
+            res = handle_action(data, addr)
+            if len(res) > 0:
+                send_message_to_addr(addr, res)
 
 
-# start_server = websockets.serve(run_server, "localhost", 8765)
+# create a TCP/IP socket server
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# bind socket
+sock.bind((HOST, PORT))
+# listen for incoming connections
+sock.listen(5)
 
-# # start server
-# asyncio.get_event_loop().run_until_complete(start_server)
-# asyncio.get_event_loop().run_forever()
+while True:
+    data_lock.acquire()
+    # accept connection
+    conn, addr = sock.accept()
+    # add connection to list of connections
+    connections[addr] = conn
+    print("Connection from {}".format(addr))
+    data_lock.release()
+
+    # handle current connection
+    new_thread = threading.Thread(target=handle_current_connection, args=(conn, addr))
+    new_thread.start()

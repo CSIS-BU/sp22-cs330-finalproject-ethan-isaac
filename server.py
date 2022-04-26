@@ -162,12 +162,14 @@ def handle_action(message, player):
         return str(code) # use current timestamp as game id
     elif message[0:9] == "join_game":
         code = message[10:len(message) - 2]
+        print("CODE", code)
         games[code]["player_2"] = player
         # deal cards
         games[code] = deal_cards(games[code])
         send_message_to_addr(player, json.dumps(get_public_game_state(games[code], 2)))
         send_message_to_addr(games[code]["player_1"], json.dumps(get_public_game_state(games[code], 1)))
-
+        return ""
+    
     msg = ""
     code = ""
     if(len(message) > 18):
@@ -214,13 +216,13 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 # bind socket
 sock.bind((HOST, PORT))
 # listen for incoming connections
-sock.listen(5)
+sock.listen(10)
 
 while True:
-    data_lock.acquire()
     # accept connection
     conn, addr = sock.accept()
     # add connection to list of connections
+    data_lock.acquire()
     connections[addr] = conn
     print("Connection from {}".format(addr))
     data_lock.release()

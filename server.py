@@ -11,6 +11,8 @@ HOST = "127.0.0.1"
 PORT = 8888  
 BUFFER_SIZE = 1024
 
+used_game_codes = []
+
 # texas hold'em hand rankings
 RANKINGS = { "High Card": 0, "Pair": 1, "Two Pair": 2, "Three of a Kind": 3, "Straight": 4, "Flush": 5, "Full House": 6, "Four of a Kind": 7, "Straight Flush": 8, "Royal Flush": 9 }
 
@@ -173,7 +175,11 @@ def send_game_state_to_players(code, comment = ""):
 
 def handle_action(message, player):
     if(message == "new_game"):
-        code = str(time.time())
+        # generate unused game code
+        code = random.randint(0, 9999)
+        while code in games:
+            code = random.randint(0, 9999)
+        
         games[code] = create_new_game(player)
         return str(code) # use current timestamp as game id
     elif message[0:9] == "join_game":

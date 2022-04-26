@@ -87,6 +87,14 @@ def evaluate_hand(hand):
 
 # deal cards to players
 def deal_cards(game_state):
+    # rotate player blinds
+    game_state["player_1_blind"], game_state["player_2_blind"] = game_state["player_2_blind"], game_state["player_1_blind"]
+
+    # take blind from each player and add to pot
+    game_state["player_1_balance"] -= game_state["player_1_blind"]
+    game_state["player_2_balance"] -= game_state["player_2_blind"]
+    game_state["pot_balance"] += game_state["player_1_blind"] + game_state["player_2_blind"]
+
     # burn a card
     game_state["deck"].pop(0)
     # deal cards to player 1
@@ -113,15 +121,16 @@ def create_new_game(player1):
         "player_2_balance": 20,
         "player_1_hand" : [],
         "player_2_hand": [],
-        "player_1_blind": 1,
-        "player_2_blind": 2,
+        "player_1_blind": 2,
+        "player_2_blind": 1,
         "throw_down_cards": [],
         "pot_balance": 0,
         "deck": deck,
-        "pending_bet": 0
+        "pending_bet": 0,
+        "comment": "",
         }
 
-def get_public_game_state(game_state, player):
+def get_public_game_state(game_state, player, comment = ""):
     if player == 1:
         return {
             "turn": game_state["turn"],
@@ -135,6 +144,7 @@ def get_public_game_state(game_state, player):
             "throw_down_cards": game_state["throw_down_cards"],
             "pot_balance": game_state["pot_balance"],
             "pending_bet": game_state["pending_bet"],
+            "comment" : comment
             }
     else:
         return {
@@ -149,15 +159,16 @@ def get_public_game_state(game_state, player):
             "throw_down_cards": game_state["throw_down_cards"],
             "pot_balance": game_state["pot_balance"],
             "pending_bet": game_state["pending_bet"],
+            "comment" : comment
             }
 
 def send_message_to_addr(addr, message):
     conn = connections[addr]
     conn.sendall(message.encode())
 
-def send_game_state_to_players(code):
-    send_message_to_addr(games[code]["player_1"], json.dumps(get_public_game_state(games[code], 1)))
-    send_message_to_addr(games[code]["player_2"], json.dumps(get_public_game_state(games[code], 2)))
+def send_game_state_to_players(code, comment = ""):
+    send_message_to_addr(games[code]["player_1"], json.dumps(get_public_game_state(games[code], 1, comment)))
+    send_message_to_addr(games[code]["player_2"], json.dumps(get_public_game_state(games[code], 2, comment)))
        
 
 def handle_action(message, player):
@@ -177,37 +188,41 @@ def handle_action(message, player):
     
     msg = ""
     code = ""
-    if(len(message) > 18):
+    if(len(message) > 17):
         code = message[:18]
         msg = message[18:]
 
+    print("CODE", code, "MSG", msg)
+
+    comment = ""
     # preemptively change turn
     current_turn = games[code]["turn"]
     games[code]["turn"] = 1 if current_turn == 2 else 2
     if msg == "check":
-        send_game_state_to_players(code)
+        comment = "Player " + str(current_turn) + " checked"
     elif "bet" in msg:
-        amount = int(msg[3:])
+        amount = int(msg[4:])
         games[code]["player_" + str(current_turn) + "_balance"] -= amount
-        games[code]["pot"] += amount
-        games[code]["pending_bet"] = int(msg[3:])
+        games[code]["pot_balance"] += amount
+        games[code]["pending_bet"] = int(msg[4:])
+        comment = "Player " + str(current_turn) + " bet " + str(amount)
     elif msg == "call":
         amount = games[code]["pending_bet"]
         games[code]["player_" + str(current_turn) + "_balance"] -= amount
-        games[code]["pot"] += amount
+        games[code]["pot_balance"] += amount
         games[code]["pending_bet"] = 0
+        comment = "Player " + str(current_turn) + " called " + str(amount)
     elif msg == "raise":
-        amount = int(msg[3:])
+        amount = int(msg[4:])
         games[code]["player_" + str(current_turn) + "_balance"] -= amount
-        games[code]["pot"] += amount
-        games[code]["pending_bet"] = int(msg[3:])
+        games[code]["pot_balance"] += amount
+        games[code]["pending_bet"] = int(msg[4:])
+        comment = "Player " + str(current_turn) + " raised " + str(amount)
     elif msg == "fold":
-        
-        pass
+        comment = "Player " + str(current_turn) + " folded "
 
-    p = 1 if games[code]["player_1"] == player else 2
-    print("Player ", p, " action: ", msg, " on game ", code)
-    send_message_to_addr(games[code]["player_" + str(1 if p == 2 else 2)], "Player " + str(p) + " " + msg + "s")
+
+    send_game_state_to_players(code, comment)
 
     return ""
 

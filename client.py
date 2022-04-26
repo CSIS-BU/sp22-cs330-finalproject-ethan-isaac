@@ -16,22 +16,25 @@ def send_message(message, s):
         data = s.recv(BUFFER_SIZE)
         return data.decode()
 
-def handle_action(action, state):
+def handle_action(action, s):
     # check
     if action == "c":
-        send_message(str(game_code) + " check", state)
+        game_state = send_message(str(game_code) + " check", s)
     # bet
     elif action == "b":
-        pass
+        # prompt for bet amount
+        bet_amount = input("Enter bet amount: ")
+        game_state = send_message(str(game_code) + " bet " + bet_amount, s)
+        
     # call
     elif action == "a":
-        send_message(str(game_code) + " call", state)
+        game_state = send_message(str(game_code) + " call", s)
     # raise
     elif action == "r":
         pass
     # fold
     elif action == "f":
-        send_message(str(game_code) + " fold", state)
+        game_state = send_message(str(game_code) + " fold", s)
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.connect((HOST, PORT))
@@ -49,32 +52,38 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         player = 2
 
 
-    turn = game_state["turn"]
-    print("Player " + str(turn) + " is up")
+    while True:
+        if(game_state["comment"]  and len(game_state["comment"]) > 0):
+            print(game_state["comment"])
 
-    if turn == player:
-        print("Your hand is: " + str(game_state["player_" + str(player) + "_hand"]))
-        print("Your balance is: " + str(game_state["player_" + str(player) + "_balance"]))
-        print("Your blind is: " + str(game_state["player_" + str(player) + "_blind"]))
-        print("Your opponent's balance is: " + str(game_state["player_" + str(3 - player) + "_balance"]))
-        print("Your opponent's blind is: " + str(game_state["player_" + str(3 - player) + "_blind"]))
-        print("The pot is: " + str(game_state["pot_balance"]))
-        print("The cards on the table are: " + str(game_state["throw_down_cards"]))
-        print("Your turn!")
-        allowed_options = ["check(c)", "bet(b)", "call(a)", "raise(r)", "fold(f)"]
-        if game_state["pending_bet"] > 0:
-            allowed_options = ["call(a) opponents bet of " + str(game_state["pending_bet"]), "raise(r)", "fold(f)"]
-        print("\n\n Your options are: " + str(allowed_options))
-        action = input("\n\nPlease enter your action: ")
-        if game_state["pending_bet"] > 0:
-            while action not in ["a", "r", "f"]:
-                action = input(str(action) + " is not a valid option. Please enter your action: ")
+        print("Comment", game_state["comment"])
+
+        turn = game_state["turn"]
+        print("Player " + str(turn) + " is up")
+
+        if turn == player:
+            print("Your hand is: " + str(game_state["player_" + str(player) + "_hand"]))
+            print("Your balance is: " + str(game_state["player_" + str(player) + "_balance"]))
+            print("Your blind is: " + str(game_state["player_" + str(player) + "_blind"]))
+            print("Your opponent's balance is: " + str(game_state["player_" + str(3 - player) + "_balance"]))
+            print("Your opponent's blind is: " + str(game_state["player_" + str(3 - player) + "_blind"]))
+            print("The pot is: " + str(game_state["pot_balance"]))
+            print("The cards on the table are: " + str(game_state["throw_down_cards"]))
+            print("Your turn!")
+            allowed_options = ["check(c)", "bet(b)", "call(a)", "raise(r)", "fold(f)"]
+            if game_state["pending_bet"] > 0:
+                allowed_options = ["call(a) opponents bet of " + str(game_state["pending_bet"]), "raise(r)", "fold(f)"]
+            print("\n\n Your options are: " + str(allowed_options))
+            action = input("\n\nPlease enter your action: ")
+            if game_state["pending_bet"] > 0:
+                while action not in ["a", "r", "f"]:
+                    action = input(str(action) + " is not a valid option. Please enter your action: ")
+            else:
+                while action not in ["a", "b", "c", "r", "f"]:
+                    action = input(str(action) + " is not a valid option. Please enter your action: ")
+
+            handle_action(action, s)
         else:
-            while action not in ["a", "b", "c", "r", "f"]:
-                action = input(str(action) + " is not a valid option. Please enter your action: ")
-    else:
-        res = s.recv(BUFFER_SIZE).decode()
-        print(res)
- 
-    sleep(300)
+            game_state = json.loads(s.recv(BUFFER_SIZE).decode())
+
 

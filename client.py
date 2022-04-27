@@ -90,9 +90,14 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         if(game_state["status"] == 1):
             # clear terminal
             print("\033c")
+        if game_state["status"] == 3:
+            print("\033c")
+            print("Game Over!")
+            print(game_state["comment"])
+            send_message("close", s)
     
         if len(game_state['comment']) > 0:
-            print("\n\n\n" + game_state["comment"] )
+            print(game_state["comment"] )
 
         print("Your hand is: ")
         print_deck(game_state["player_" + str(player) + "_hand"])
@@ -109,7 +114,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             print("You are up")
             # print("Your hand is: " + str(game_state["player_" + str(player) + "_hand"]))
             
-            allowed_options = ["check(c)", "bet(b)", "call(a)", "raise(r)", "fold(f)"]
+            allowed_options = ["check(c)", "bet(b)", "fold(f)"]
             if game_state["pending_bet"] > 0:
                 print("The pending bet is: " + str(game_state["pending_bet"]))
                 allowed_options = ["call(a) opponents bet of " + str(game_state["pending_bet"]), "raise(r)", "fold(f)"]
@@ -119,7 +124,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 while action not in ["a", "r", "f"]:
                     action = input(str(action) + " is not a valid option. Please enter your action: ")
             else:
-                while action not in ["a", "b", "c", "r", "f"]:
+                while action not in [ "b", "c", "f"]:
                     action = input(str(action) + " is not a valid option. Please enter your action: ")
 
             game_state = json.loads(handle_action(action, s, game_state, player))

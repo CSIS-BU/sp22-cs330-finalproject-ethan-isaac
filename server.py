@@ -57,34 +57,109 @@ def shuffle_deck(deck):
     random.shuffle(deck)
     return deck
 
+# check for pair of cards across sorted hand
+def check_for_pair(hand):
+    for i in range(len(hand) - 1):
+        if hand[i][1] == hand[i+1][1]:
+            return (hand[i][1], hand[i+1][1])
+    return False
+
+# check for two separate pairs of cards across sorted hand
+def check_for_two_pairs(hand):
+    first_pair = check_for_pair(hand)
+    if first_pair:
+        second_pair = check_for_pair(list(filter(lambda x: x[1] not in first_pair, hand)))
+        if second_pair:
+            return (first_pair, second_pair)
+    return False
+
+# check for three of a kind across sorted hand
+def check_for_three_of_a_kind(hand):
+    for i in range(len(hand) - 2):
+        if hand[i][1] == hand[i+1][1] == hand[i+2][1]:
+            return (hand[i][1], hand[i+1][1], hand[i+2][1])
+    return False
+
+# check for full house across sorted hand
+def check_for_full_house(hand):
+    three_of_a_kind = check_for_three_of_a_kind(hand)
+    if three_of_a_kind:
+        pair = check_for_pair(list(filter(lambda x: x[1] not in three_of_a_kind, hand)))
+        if pair:
+            return (three_of_a_kind, pair) 
+    return False
+
+# check for four of a kind across sorted hand
+def check_for_four_of_a_kind(hand):
+    for i in range(len(hand) - 3):
+        if hand[i][1] == hand[i+1][1] == hand[i+2][1] == hand[i+3][1]:
+            return (hand[i][1], hand[i+1][1], hand[i+2][1], hand[i+3][1])
+    return False
+
+# check for straight across all sorted hand
+def check_for_straight(hand):
+    in_a_row = []
+    for i in range(1, len(hand)):
+        if hand[i][1] == hand[i-1][1] + 1:
+            in_a_row.append(hand[i][1])
+        else:
+            in_a_row = []
+    return in_a_row if len(in_a_row) == 4 else False
+
+# check for flush across sorted hand
+def check_for_flush(hand):
+    in_a_row = []
+    for i in range(len(hand) - 1):
+        if hand[i][0] == hand[i+1][0]:
+            in_a_row.append(hand[i][1])
+        else:
+            in_a_row = []
+    return in_a_row if len(in_a_row) == 4 else False
+
+# check for royal flush across sorted hand
+def check_for_royal_flush(hand):
+    flush = check_for_flush(hand)
+    return flush if flush == [1, 10, 11, 12, 13] else False
+
+# check for straight flush across sorted hand
+def check_for_straight_flush(hand):
+    flush = check_for_flush(hand)
+    if flush:
+        if check_for_straight(list(map(lambda x: (0, x), flush))):
+            return flush
+    return False
+
 def evaluate_hand(hand):
     print("Evaluating hand: ", hand)
     print_deck(hand)
     # check for royal flush
-    if hand[0][1] == 1 and hand[1][1] == 10 and hand[2][1] == 11 and hand[3][1] == 12 and hand[4][1] == 13:
+    if check_for_royal_flush(hand):
         return "Royal Flush"
-    # check for flush
-    if hand[0][0] == hand[1][0] == hand[2][0] == hand[3][0] == hand[4][0]:
-        return "Flush"
-    # check for straight
-    if hand[0][1] == hand[1][1] + 1 == hand[2][1] + 2 == hand[3][1] + 3 == hand[4][1] + 4:
-        return "Straight"
+    # check for straight flush
+    elif check_for_straight_flush(hand):
+        return "Straight Flush"
     # check for four of a kind
-    if hand[0][1] == hand[1][1] == hand[2][1] == hand[3][1]:
+    elif check_for_four_of_a_kind(hand):
         return "Four of a Kind"
     # check for full house
-    if hand[0][1] == hand[1][1] == hand[2][1] and hand[3][1] == hand[4][1]:
+    elif check_for_full_house(hand):
         return "Full House"
+    # check for flush
+    elif check_for_flush(hand):
+        return "Flush"
+    # check for straight
+    elif check_for_straight(hand):
+        return "Straight"
     # check for three of a kind
-    if hand[0][1] == hand[1][1] == hand[2][1]:
+    elif check_for_three_of_a_kind(hand):
         return "Three of a Kind"
-    # check for two pair
-    if hand[0][1] == hand[1][1] and hand[2][1] == hand[3][1]:
+    # check for two pairs
+    elif check_for_two_pairs(hand):
         return "Two Pair"
     # check for pair
-    if hand[0][1] == hand[1][1]:
+    elif check_for_pair(hand):
         return "Pair"
-    # check for high card
+
     return "High Card"
 
 # evaluate hand
@@ -249,27 +324,31 @@ def next_cards(code):
         player_2_hand = evaluate_possible_hands(game_state["player_2_hand"] + game_state["throw_down_cards"])
         print("RESULTS", player_1_hand, player_2_hand)
         comment = "Player 1: " + player_1_hand[0] + " || Player 2: " + player_2_hand[0]
+        balance = game_state["pot_balance"]
         reset_game_state(games[code])
         deal_cards(games[code])
         if(player_1_hand[1] > player_2_hand[1]):
-            game_state["player_1_balance"] += game_state["pot_balance"]
+            game_state["player_1_balance"] += balance
             winner = "Player 1 Wins Hand"
-        elif(player_1_hand[1] < player_2_hand[1]):
-            game_state["player_2_balance"] += game_state["pot_balance"]
+        elif(player_2_hand[1] > player_1_hand[1]):
+            game_state["player_2_balance"] += balance
             winner = "Player 2 Wins Hand"
         else:
-            game_state["player_1_balance"] += int(game_state["pot_balance"]) / 2
-            games[code]["player_2_balance"] += int(game_state["pot_balance"]) / 2
+            game_state["player_1_balance"] += int(balance / 2)
+            games[code]["player_2_balance"] += int(balance / 2)
             winner = "Tie Hand"
         
-        # print player balances
-        print("Player 1 Balance: " + str(game_state["player_1_balance"]))
-        print("Player 2 Balance: " + str(game_state["player_2_balance"]))
+        print("\n\n\nWinner: ", winner, "\nPlayer_1 Eval: ", player_1_hand, "\nPlayer_2_Eval:", player_2_hand, "\n\n\n")
+        print("Player 1 Balance: ", game_state["player_1_balance"], "\nPlayer 2 Balance: ", game_state["player_2_balance"], "\nTypes: ", type(game_state["player_1_balance"]), type(game_state["player_2_balance"]))
+        print("Pot Balance: ", game_state["pot_balance"], "Type: ", type(game_state["pot_balance"]))
+        print("HALF", int(game_state["pot_balance"]) / 2)
 
         if(game_state["player_1_balance"] <= 0):
-            winner = "Player 2 Wins with " + str(game_state["player_1_balance"]) + " Chips"
+            winner = "Player 2 Wins with " + str(game_state["player_2_balance"] + 2) + " Chips"
+            game_state["status"] = 3
         elif(game_state["player_2_balance"] <= 0):
-            winner = "Player 1 Wins with " + str(game_state["player_2_balance"]) + " Chips"
+            winner = "Player 1 Wins with " + str(game_state["player_1_balance"] + 2) + " Chips"
+            game_state["status"] = 3
         
         games[code] = game_state
         comment += "\n" + winner
@@ -320,7 +399,10 @@ def handle_action(message, player):
         amount = games[code]["pending_bet"]
         games[code]["player_1_balance"] -= amount
         games[code]["player_2_balance"] -= amount
-        games[code]["pot_balance"] += amount + amount
+        if games[code]["player_" + str(current_turn) + "_balance"] <= 0:
+            games[code]["pot_balance"] += games[code]["player_" + str(current_turn) + "_balance"]
+            games[code]["player_" + str(current_turn) + "_balance"] = 0
+        games[code]["pot_balance"] +=  (amount * 2)
         games[code]["pending_bet"] = 0
         comment = "Player " + str(current_turn) + " called " + str(amount)
     elif "raise" in msg:
@@ -332,7 +414,6 @@ def handle_action(message, player):
         games[code]["last_to_bet"] = current_turn
         print("RAISED TO", games[code]["pending_bet"])
     elif msg == "fold":
-        print("Adding to player " + str(3 - current_turn) + " hand amount " + str(games[code]["pot_balance"]))
         games[code]["player_" + str(3 - current_turn) + "_balance"] += games[code]["pot_balance"]
         # reset game state
         reset_game_state(games[code])
